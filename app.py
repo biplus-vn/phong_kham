@@ -94,5 +94,3 @@ st.caption("Ứng dụng quản trị vận hành phòng khám - Tối ưu hóa 
 ### Gợi ý cho bạn:
 1.  **Dữ liệu thực tế:** Trong Tab 3, khi bạn viết thuật toán `ortools`, hãy chuyển đổi `st.session_state.patients_list` thành một DataFrame. Từ đó, bạn có thể dễ dàng map (ánh xạ) dữ liệu này vào các biến của `cp_model` (ví dụ: tạo biến quyết định `x[customer_id, doctor_id, time_slot]`).
 2.  **Khả năng mở rộng:** Nếu bạn cần xuất lịch phân bổ ra file Excel để gửi cho bác sĩ hoặc điều dưỡng, bạn có thể thêm một nút `st.download_button` ở Tab 3 để tải kết quả dưới dạng file `.xlsx` bằng thư viện `io` và `xlsxwriter`.
-
-Ứng dụng của bạn đã sẵn sàng. Bạn có muốn tôi hỗ trợ viết chi tiết cấu trúc biến quyết định (Decision Variables) cho thuật toán CP-SAT để ánh xạ chính xác với Form này không?
