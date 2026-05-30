@@ -21,7 +21,7 @@ st.title("🏥 Hệ thống Tối ưu hóa Phân công - Phòng khám Hàng Bôn
 with st.sidebar:
     st.header("Cấu hình Dữ liệu")
     uploaded_file = st.file_uploader("Upload danh sách bác sĩ (CSV/Excel)", type=['csv', 'xlsx'])
-    doctor_list = ["Bác sĩ Nguyễn Văn A", "Bác sĩ Trần Thị B", "Bác sĩ Lê Văn C"]
+    doctor_list = ["TS Đặng Hữu Phúc", "Th.S Nguyễn Thảo Dương", "BS Đỗ Phi Hưng", "BS Nguyễn Thu Hương", "BS Thương yêu", "Th.s Vương Ngọc Toàn", "BS Quan Thị Giao Linh", "BS Nguyễn Nhật Anh"]
     if uploaded_file:
         try:
             df_doctors = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
@@ -39,27 +39,26 @@ with tab1:
         with col1:
             full_name = st.text_input("Họ và tên *")
             gender = st.selectbox("Giới tính", ["Nam", "Nữ", "Khác"])
-            doctor_select = st.selectbox("Bác sĩ khám/ Điều trị *", doctor_list)
+            dob = st.date_input("Ngày tháng năm sinh", min_value=datetime(1900, 1, 1))
+            phone = st.text_input("Số điện thoại *")
             service_type = st.selectbox("Loại dịch vụ *", ["Khám mới", "Tái khám", "Điều trị theo vùng", "Điều trị chuyên sâu"])
         
         with col2:
-            phone = st.text_input("Số điện thoại *")
-            dob = st.date_input("Ngày tháng năm sinh", min_value=datetime(1900, 1, 1))
+            doctor_select = st.selectbox("Bác sĩ khám/ Điều trị *", doctor_list)
+            exam_date = st.date_input("Ngày Khám/Điều trị *", min_value=datetime.today())
             
             # Tạo mốc thời gian (bước 15 phút)
             time_options = []
             curr = datetime.combine(datetime.today(), time(8, 0))
             end_morning = datetime.combine(datetime.today(), time(12, 0))
             while curr <= end_morning:
-                time_options.append(curr.time())
-                curr += timedelta(minutes=15)
+                time_options.append(curr.time()); curr += timedelta(minutes=15)
             curr = datetime.combine(datetime.today(), time(13, 30))
             end_evening = datetime.combine(datetime.today(), time(18, 0))
             while curr <= end_evening:
-                time_options.append(curr.time())
-                curr += timedelta(minutes=15)
+                time_options.append(curr.time()); curr += timedelta(minutes=15)
             
-            appointment_time = st.select_slider("Thời gian đặt lịch *", options=time_options, format_func=lambda x: x.strftime('%H:%M'))
+            appointment_time = st.select_slider("Giờ Khám/Điều trị *", options=time_options, format_func=lambda x: x.strftime('%H:%M'))
         
         reason = st.text_area("Lý do tới khám/ Điều trị")
         submit_button = st.form_submit_button("Lưu đặt lịch")
@@ -68,17 +67,12 @@ with tab1:
             if not full_name or not phone:
                 st.error("Vui lòng điền đầy đủ các trường bắt buộc (*)")
             elif not is_valid_phone(phone):
-                st.error("Số điện thoại không hợp lệ! Vui lòng nhập đúng 10 chữ số bắt đầu bằng số 0.")
+                st.error("Số điện thoại không hợp lệ!")
             else:
                 new_patient = {
-                    "Họ tên": full_name,
-                    "Giới tính": gender,
-                    "Ngày sinh": str(dob),
-                    "Số điện thoại": phone,
-                    "Dịch vụ": service_type,
-                    "Bác sĩ": doctor_select,
-                    "Thời gian": str(appointment_time),
-                    "Lý do": reason
+                    "Họ tên": full_name, "Giới tính": gender, "Ngày sinh": str(dob), "Số điện thoại": phone,
+                    "Dịch vụ": service_type, "Bác sĩ": doctor_select, "Ngày Khám/Điều trị": str(exam_date),
+                    "Giờ Khám/Điều trị": str(appointment_time), "Lý do": reason
                 }
                 st.session_state.patients_list.append(new_patient)
                 st.success(f"Đã thêm khách hàng {full_name} thành công!")
@@ -98,7 +92,7 @@ with tab2:
 
     if len(st.session_state.patients_list) > 0:
         df_patients = pd.DataFrame(st.session_state.patients_list)
-        display_cols = ["Họ tên", "Giới tính", "Ngày sinh", "Số điện thoại", "Dịch vụ", "Bác sĩ", "Thời gian", "Lý do"]
+        display_cols = ["Họ tên", "Giới tính", "Ngày sinh", "Số điện thoại", "Dịch vụ", "Bác sĩ", "Ngày Khám/Điều trị", "Giờ Khám/Điều trị", "Lý do"]
         available_cols = [c for c in display_cols if c in df_patients.columns]
         st.dataframe(df_patients[available_cols], use_container_width=True)
     else:
@@ -107,11 +101,10 @@ with tab2:
 with tab3:
     st.header("Tính toán tối ưu hóa")
     if st.button("Chạy Thuật toán Phân công (CP-SAT)"):
-        st.write("Đang cấu hình dữ liệu cho solver...")
+        st.write("Đang cấu hình dữ liệu...")
     if st.button("Xóa toàn bộ danh sách"):
         st.session_state.patients_list = []
         st.rerun()
 
-# --- CHÂN TRANG ---
 st.markdown("---")
 st.caption("Ứng dụng quản trị vận hành phòng khám - Tối ưu hóa bằng CP-SAT")
