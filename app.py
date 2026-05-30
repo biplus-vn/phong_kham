@@ -101,9 +101,18 @@ with tab2:
 
     if len(st.session_state.patients_list) > 0:
         df_patients = pd.DataFrame(st.session_state.patients_list)
-        display_cols = ["Họ tên", "Giới tính", "Ngày sinh", "Số điện thoại", "Dịch vụ", "Bác sĩ", "Ngày Khám/Trị liệu", "Giờ Khám/Trị liệu", "Lý do"]
+        
+        # Định dạng Số điện thoại thành chuỗi và xử lý lỗi đuôi .0
+        df_patients["Số điện thoại"] = df_patients["Số điện thoại"].astype(str).str.replace(r'\.0$', '', regex=True)
+        
+        # Thêm cột số thứ tự (TT)
+        df_patients["TT"] = range(1, len(df_patients) + 1)
+        
+        # Cấu hình thứ tự hiển thị
+        display_cols = ["TT", "Họ tên", "Giới tính", "Ngày sinh", "Số điện thoại", "Dịch vụ", "Bác sĩ", "Ngày Khám/Trị liệu", "Giờ Khám/Trị liệu", "Lý do"]
         available_cols = [c for c in display_cols if c in df_patients.columns]
-        st.dataframe(df_patients[available_cols], use_container_width=True)
+        
+        st.dataframe(df_patients[available_cols], use_container_width=True, hide_index=True)
     else:
         st.info("Chưa có khách hàng nào.")
 
