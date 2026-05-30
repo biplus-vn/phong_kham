@@ -122,7 +122,37 @@ with tab3:
                         h, m = 8 + (t * 15) // 60, (t * 15) % 60
                         results.append({"Họ tên": row["Họ tên"], "Giờ": f"{h:02d}:{m:02d}", "Bác sĩ": doctor_list[d]})
             st.dataframe(pd.DataFrame(results))
-        else: st.error("Không tìm thấy phương án tối ưu.")
+        else: 
+            st.error("⚠️ Không tìm thấy phương án tối ưu!")
+            
+            # --- HÀM PHÂN TÍCH NGUYÊN NHÂN CHI TIẾT ---
+            st.subheader("🔍 Chẩn đoán nguyên nhân bế tắc:")
+            
+            # 1. Kiểm tra tải trọng bác sĩ
+            # Tổng block bệnh nhân yêu cầu / (Số lượng bác sĩ * tổng block làm việc)
+            total_required_blocks = sum(durations.get(r["Dịch vụ"], 3) for _, r in df_today.iterrows())
+            total_available_doctor_blocks = len(doctor_list) * horizon
+            
+            # 2. Kiểm tra xung đột dịch vụ chuyên sâu (chỉ 3 bác sĩ đầu tiên)
+            specialized_patients = df_today[df_today["Dịch vụ"].isin(["Điều trị theo vùng", "Điều trị chuyên sâu"])]
+            specialized_blocks = sum(durations.get(r["Dịch vụ"], 3) for _, r in specialized_patients.iterrows())
+            capacity_specialized = 3 * horizon # 3 bác sĩ * 34 block
+            
+            # Hiển thị phân tích
+            col1, col2 = st.columns(2)
+            col1.metric("Tổng thời gian yêu cầu", f"{total_required_blocks} blocks")
+            col2.metric("Tổng năng lực toàn hệ thống", f"{total_available_doctor_blocks} blocks")
+            
+            if total_required_blocks > total_available_doctor_blocks:
+                st.error(f"❌ **Quá tải tổng thể:** Tổng nhu cầu của {len(df_today)} bệnh nhân ({total_required_blocks} blocks) vượt quá năng lực phục vụ của tất cả các bác sĩ cộng lại ({total_available_doctor_blocks} blocks).")
+            
+            if specialized_blocks > capacity_specialized:
+                st.error(f"❌ **Quá tải dịch vụ chuyên sâu:** Bạn có {len(specialized_patients)} ca điều trị khó, cần {specialized_blocks} blocks, nhưng chỉ có 3 bác sĩ thực hiện được với tổng năng lực {capacity_specialized} blocks.")
+            
+            if len(df_today) > 100: # Ví dụ ngưỡng chặn
+                st.warning("⚠️ Số lượng bệnh nhân quá lớn cho một ngày. Solver sẽ bị giới hạn bộ nhớ và thời gian tính toán.")
+
+            st.info("💡 **Giải pháp:** Hãy chia nhỏ danh sách thành nhiều ngày, hoặc thêm bác sĩ có chuyên môn điều trị chuyên sâu.")
 
     if st.button("Xóa toàn bộ danh sách"):
         st.session_state.patients_list = []
