@@ -86,8 +86,7 @@ with tab2:
     if uploaded_patients:
         try:
             df_new = pd.read_excel(uploaded_patients) if uploaded_patients.name.endswith('.xlsx') else pd.read_csv(uploaded_patients)
-            for _, row in df_new.iterrows():
-                st.session_state.patients_list.append(row.to_dict())
+            st.session_state.patients_list = df_new.to_dict('records')
             st.success("Đã thêm dữ liệu từ file!")
         except Exception as e:
             st.error(f"Lỗi file: {e}")
