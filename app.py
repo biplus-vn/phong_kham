@@ -35,16 +35,26 @@ tab1, tab2, tab3 = st.tabs(["📋 Đặt lịch khách hàng", "📅 Danh sách 
 with tab1:
     st.info("⏰ Giờ hoạt động: Sáng (08:00 - 12:00) | Chiều (13:30 - 18:00)")
     with st.form("booking_form", clear_on_submit=True):
-        # Layout từ trên xuống, từ trái qua phải
-        full_name = st.text_input("Họ tên *")
-        gender = st.selectbox("Giới tính", ["Nam", "Nữ", "Khác"])
-        dob = st.date_input("Ngày sinh", min_value=datetime(1900, 1, 1))
-        phone = st.text_input("Số điện thoại *")
-        service_type = st.selectbox("Dịch vụ *", ["Khám mới", "Tái khám", "Điều trị theo vùng", "Điều trị chuyên sâu"])
-        doctor_select = st.selectbox("Bác sĩ *", doctor_list)
-        exam_date = st.date_input("Ngày Khám/Trị liệu *", min_value=datetime.today())
+        # Dòng 1
+        c1, c2 = st.columns(2)
+        full_name = c1.text_input("Họ tên *")
+        gender = c2.selectbox("Giới tính", ["Nam", "Nữ", "Khác"])
         
-        # Tạo mốc thời gian (bước 15 phút)
+        # Dòng 2
+        c3, c4 = st.columns(2)
+        dob = c3.date_input("Ngày sinh", min_value=datetime(1900, 1, 1))
+        phone = c4.text_input("Số điện thoại *")
+        
+        # Dòng 3
+        c5, c6 = st.columns(2)
+        service_type = c5.selectbox("Dịch vụ *", ["Khám mới", "Tái khám", "Điều trị theo vùng", "Điều trị chuyên sâu"])
+        doctor_select = c6.selectbox("Bác sĩ *", doctor_list)
+        
+        # Dòng 4
+        c7, c8 = st.columns(2)
+        exam_date = c7.date_input("Ngày Khám/Trị liệu *", min_value=datetime.today())
+        
+        # Logic tạo giờ
         time_options = []
         curr = datetime.combine(datetime.today(), time(8, 0))
         end_morning = datetime.combine(datetime.today(), time(12, 0))
@@ -54,8 +64,10 @@ with tab1:
         end_evening = datetime.combine(datetime.today(), time(18, 0))
         while curr <= end_evening:
             time_options.append(curr.time()); curr += timedelta(minutes=15)
+            
+        appointment_time = c8.select_slider("Giờ Khám/Trị liệu *", options=time_options, format_func=lambda x: x.strftime('%H:%M'))
         
-        appointment_time = st.select_slider("Giờ Khám/Trị liệu *", options=time_options, format_func=lambda x: x.strftime('%H:%M'))
+        # Dòng 5
         reason = st.text_area("Lý do")
         
         submit_button = st.form_submit_button("Lưu đặt lịch")
