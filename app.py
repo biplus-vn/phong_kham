@@ -101,43 +101,54 @@ with tab2:
         st.dataframe(df_patients[available_cols], use_container_width=True, hide_index=True)
 
 with tab3:
-    st.header("🚀 Chạy Tối ưu hóa")
+    st.header("🚀 Chạy Tối ưu hóa (Phương pháp chuyên sâu)")
     target_date = st.date_input("Chọn ngày tối ưu hóa:", min_value=datetime.today())
-    if st.button("Chạy Thuật toán Phân công (CP-SAT)"):
+    
+    if st.button("Chạy Thuật toán Phân công"):
         df_today = pd.DataFrame(st.session_state.patients_list)
-        if df_today.empty:
-            st.warning("Danh sách trống!")
-        else:
-            model = cp_model.CpModel()
-            horizon = 34
-            duration_map = {"Khám mới": 3, "Tái khám": 3, "Điều trị theo vùng": 5, "Điều trị chuyên sâu": 8}
-            intervals = []
-            for idx, row in df_today.iterrows():
-                dur = duration_map.get(row["Dịch vụ"], 3)
-                start = model.NewIntVar(0, horizon - dur, f"s{idx}")
-                end = model.NewIntVar(0, horizon, f"e{idx}")
-                interval = model.NewIntervalVar(start, dur, end, f"i{idx}")
-                intervals.append({"id": idx, "start": start, "interval": interval, "service": row["Dịch vụ"], "doctor": row["Bác sĩ"]})
-
-            doctor_groups = {}
-            for item in intervals:
-                doc = item["doctor"]
-                if doc not in doctor_groups: doctor_groups[doc] = []
-                doctor_groups[doc].append(item["interval"])
-            for doc_ints in doctor_groups.values(): model.AddNoOverlap(doc_ints)
-
-            model.AddCumulative([i["interval"] for i in intervals if i["service"] in ["Khám mới", "Tái khám"]], [1]*len(intervals), 3)
+        if df_today.empty: st.warning("Danh sách trống!"); st.stop()
+        
+        model = cp_model.CpModel()
+        horizon = 34
+        durations = {"Khám mới": 3, "Tái khám": 3, "Điều trị theo vùng": 5, "Điều trị chuyên sâu": 8}
+        
+        # 1. Tạo biến quyết định
+        # X[i, d, t] = 1 nếu bệnh nhân i khám bác sĩ d tại thời điểm t
+        x = {}
+        for i, row in df_today.iterrows():
+            d_dur = durations.get(row["Dịch vụ"], 3)
+            # Ràng buộc bác sĩ: Nếu trống, cho phép toàn bộ danh sách, nếu đã chọn thì chỉ 1 bác sĩ
+            valid_docs = [doctor_list.index(row["Bác sĩ"])] if pd.notna(row["Bác sĩ"]) and row["Bác sĩ"] in doctor_list else range(len(doctor_list))
             
-            solver = cp_model.CpSolver()
-            if solver.Solve(model) == cp_model.OPTIMAL:
-                st.success("Tối ưu hóa thành công!")
-                results = []
-                for item in intervals:
-                    start_time = solver.Value(item["start"])
-                    h = 8 + (start_time * 15) // 60
-                    m = (start_time * 15) % 60
-                    results.append({"Họ tên": df_today.loc[item["id"], "Họ tên"], "Giờ bắt đầu": f"{h:02d}:{m:02d}", "Bác sĩ": item["doctor"]})
-                st.dataframe(pd.DataFrame(results))
+            # Giới hạn dịch vụ khó
+            if row["Dịch vụ"] in ["Điều trị theo vùng", "Điều trị chuyên sâu"]:
+                valid_docs = [d for d in valid_docs if d <= 2] # TS Phúc, Th.S Dương, BS Hưng
+            
+            for d in valid_docs:
+                for t in range(horizon - d_dur + 1):
+                    x[i, d, t] = model.NewBoolVar(f'x_p{i}_d{d}_t{t}')
+        
+        # 2. Ràng buộc: Mỗi bệnh nhân chỉ được chọn 1 cặp (Bác sĩ, Giờ)
+        for i in range(len(df_today)):
+            model.Add(sum(x[i, d, t] for (p, d, t) in x if p == i) == 1)
+            
+        # 3. Ràng buộc: Không trùng lịch bác sĩ (No Overlap)
+        for d in range(len(doctor_list)):
+            for t in range(horizon):
+                # Tổng số bệnh nhân của bác sĩ d tại thời điểm t phải <= 1
+                model.Add(sum(x[i, d, start] for (i, doc, start) in x if doc == d and start <= t < start + durations.get(df_today.iloc[i]["Dịch vụ"], 3)) <= 1)
+
+        # 4. Giải bài toán
+        solver = cp_model.CpSolver()
+        if solver.Solve(model) == cp_model.OPTIMAL:
+            st.success("Phân bổ tự động hoàn thành!")
+            results = []
+            for i, row in df_today.iterrows():
+                for (p, d, t) in x:
+                    if p == i and solver.Value(x[p, d, t]) == 1:
+                        h, m = 8 + (t * 15) // 60, (t * 15) % 60
+                        results.append({"Họ tên": row["Họ tên"], "Giờ": f"{h:02d}:{m:02d}", "Bác sĩ": doctor_list[d]})
+            st.dataframe(pd.DataFrame(results))
             else:
                 st.error("⚠️ Không tìm thấy phương án tối ưu!")
                 
