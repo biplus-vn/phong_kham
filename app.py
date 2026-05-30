@@ -26,8 +26,8 @@ with st.sidebar:
         try:
             df_doctors = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
             doctor_list = df_doctors['ho_va_ten'].unique().tolist()
-        except:
-            st.error("Lỗi đọc file")
+        except Exception as e:
+            st.error(f"Lỗi đọc file: {e}")
 
 # --- TABS ---
 tab1, tab2, tab3 = st.tabs(["📋 Đặt lịch khách hàng", "📅 Danh sách chờ", "🚀 Chạy Tối ưu hóa"])
@@ -38,22 +38,21 @@ with tab1:
         col1, col2 = st.columns(2)
         with col1:
             full_name = st.text_input("Họ và tên *")
+            gender = st.selectbox("Giới tính", ["Nam", "Nữ", "Khác"])
+            dob = st.date_input("Ngày tháng năm sinh", min_value=datetime(1900, 1, 1))
             service_type = st.selectbox("Loại dịch vụ *", ["Khám mới", "Tái khám", "Điều trị theo vùng", "Điều trị chuyên sâu"])
         
         with col2:
             phone = st.text_input("Số điện thoại *")
             doctor_select = st.selectbox("Bác sĩ khám/ Điều trị *", doctor_list)
             
-            # GIẢI PHÁP: Sử dụng select_slider để giới hạn khung giờ
-            # Tạo danh sách các mốc thời gian 5 phút/lần
+            # Khởi tạo mốc thời gian (bước 15 phút)
             time_options = []
-            # Sáng: 8h00 - 12h00
             curr = datetime.combine(datetime.today(), time(8, 0))
             end_morning = datetime.combine(datetime.today(), time(12, 0))
             while curr <= end_morning:
                 time_options.append(curr.time())
                 curr += timedelta(minutes=15)
-            # Chiều: 13h30 - 18h00
             curr = datetime.combine(datetime.today(), time(13, 30))
             end_evening = datetime.combine(datetime.today(), time(18, 0))
             while curr <= end_evening:
@@ -61,27 +60,41 @@ with tab1:
                 curr += timedelta(minutes=15)
             
             appointment_time = st.select_slider("Thời gian đặt lịch *", options=time_options, format_func=lambda x: x.strftime('%H:%M'))
-
+        
+        reason = st.text_area("Lý do tới khám/ Điều trị")
         submit_button = st.form_submit_button("Lưu đặt lịch")
         
         if submit_button:
             if not full_name or not phone:
-                st.error("Vui lòng điền đủ thông tin bắt buộc (*)")
+                st.error("Vui lòng điền đầy đủ các trường bắt buộc (*)")
             elif not is_valid_phone(phone):
-                st.error("Số điện thoại không hợp lệ (cần 10 số, bắt đầu bằng 0)")
+                st.error("Số điện thoại không hợp lệ! Vui lòng nhập đúng 10 chữ số bắt đầu bằng số 0.")
             else:
                 new_patient = {
-                    "Họ và tên": full_name, "Dịch vụ": service_type,
-                    "Số điện thoại": phone, "Thời gian": str(appointment_time), "Bác sĩ": doctor_select
+                    "Họ và tên": full_name,
+                    "Giới tính": gender,
+                    "Ngày sinh": str(dob),
+                    "Dịch vụ": service_type,
+                    "Số điện thoại": phone,
+                    "Lý do": reason,
+                    "Thời gian": str(appointment_time),
+                    "Bác sĩ": doctor_select
                 }
                 st.session_state.patients_list.append(new_patient)
-                st.success(f"Đã đặt lịch cho {full_name} lúc {appointment_time}")
+                st.success(f"Đã thêm khách hàng {full_name} vào hệ thống!")
 
 with tab2:
+    st.header("Danh sách khách hàng chờ xếp lịch")
     if len(st.session_state.patients_list) > 0:
         st.dataframe(pd.DataFrame(st.session_state.patients_list), use_container_width=True)
+    else:
+        st.info("Chưa có khách hàng nào.")
 
 with tab3:
     st.header("Tính toán tối ưu hóa")
     if st.button("Chạy Thuật toán Phân công (CP-SAT)"):
-        st.write("Đã sẵn sàng các ràng buộc về khung giờ hoạt động.")
+        st.write("Đã sẵn sàng dữ liệu khách hàng cho việc tối ưu hóa.")
+
+# --- CHÂN TRANG ---
+st.markdown("---")
+st.caption("Ứng dụng quản trị vận hành phòng khám - Tối ưu hóa bằng CP-SAT")
