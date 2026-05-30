@@ -7,6 +7,14 @@ from ortools.sat.python import cp_model
 # --- CẤU HÌNH TRANG ---
 st.set_page_config(page_title="Phòng khám Hàng Bông - Vận hành", layout="wide")
 
+# --- ĐỊNH NGHĨA BIẾN CẤU HÌNH (QUAN TRỌNG: ĐẶT Ở ĐÂY ĐỂ TRÁNH NAMEERROR) ---
+DOCTOR_LIST = ["TS Đặng Hữu Phúc", "Th.S Nguyễn Thảo Dương", "BS Đỗ Phi Hưng", "BS Nguyễn Thu Hương", "BS Thương yêu", "Th.s Vương Ngọc Toàn", "BS Quan Thị Giao Linh", "BS Nguyễn Nhật Anh"]
+DURATIONS = {"Khám mới": 3, "Tái khám": 3, "Điều trị theo vùng": 5, "Điều trị chuyên sâu": 8}
+HORIZON = 34 
+
+if 'patients_list' not in st.session_state:
+    st.session_state.patients_list = []
+
 # --- QUẢN LÝ TRẠNG THÁI ---
 if 'patients_list' not in st.session_state:
     st.session_state.patients_list = []
