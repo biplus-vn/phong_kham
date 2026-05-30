@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import re
 from datetime import datetime, time, timedelta
+from ortools.sat.python import cp_model
 
 # --- CẤU HÌNH TRANG ---
 st.set_page_config(page_title="Phòng khám Hàng Bông - Vận hành", layout="wide")
@@ -35,26 +36,21 @@ tab1, tab2, tab3 = st.tabs(["📋 Đặt lịch khách hàng", "📅 Danh sách 
 with tab1:
     st.info("⏰ Giờ hoạt động: Sáng (08:00 - 12:00) | Chiều (13:30 - 18:00)")
     with st.form("booking_form", clear_on_submit=True):
-        # Dòng 1
         c1, c2 = st.columns(2)
         full_name = c1.text_input("Họ tên *")
         gender = c2.selectbox("Giới tính", ["Nam", "Nữ", "Khác"])
         
-        # Dòng 2
         c3, c4 = st.columns(2)
         dob = c3.date_input("Ngày sinh", min_value=datetime(1900, 1, 1))
         phone = c4.text_input("Số điện thoại *")
         
-        # Dòng 3
         c5, c6 = st.columns(2)
         service_type = c5.selectbox("Dịch vụ *", ["Khám mới", "Tái khám", "Điều trị theo vùng", "Điều trị chuyên sâu"])
         doctor_select = c6.selectbox("Bác sĩ *", doctor_list)
         
-        # Dòng 4
         c7, c8 = st.columns(2)
         exam_date = c7.date_input("Ngày Khám/Trị liệu *", min_value=datetime.today())
         
-        # Logic tạo giờ
         time_options = []
         curr = datetime.combine(datetime.today(), time(8, 0))
         end_morning = datetime.combine(datetime.today(), time(12, 0))
@@ -67,9 +63,7 @@ with tab1:
             
         appointment_time = c8.select_slider("Giờ Khám/Trị liệu *", options=time_options, format_func=lambda x: x.strftime('%H:%M'))
         
-        # Dòng 5
         reason = st.text_area("Lý do")
-        
         submit_button = st.form_submit_button("Lưu đặt lịch")
         
         if submit_button:
@@ -89,7 +83,6 @@ with tab1:
 with tab2:
     st.header("Danh sách khách hàng chờ xếp lịch")
     uploaded_patients = st.file_uploader("Upload file khách hàng", type=['xlsx', 'csv'])
-    
     if uploaded_patients:
         try:
             df_new = pd.read_excel(uploaded_patients) if uploaded_patients.name.endswith('.xlsx') else pd.read_csv(uploaded_patients)
@@ -101,23 +94,12 @@ with tab2:
 
     if len(st.session_state.patients_list) > 0:
         df_patients = pd.DataFrame(st.session_state.patients_list)
-        
-        # XỬ LÝ ĐỊNH DẠNG SỐ ĐIỆN THOẠI CHUẨN:
-        # 1. Chuyển sang chuỗi, loại bỏ định dạng float (.0)
-        # 2. Đảm bảo có đủ 10 số, thêm số 0 vào đầu nếu thiếu
         df_patients["Số điện thoại"] = df_patients["Số điện thoại"].astype(str).str.replace(r'\.0$', '', regex=True)
         df_patients["Số điện thoại"] = df_patients["Số điện thoại"].apply(lambda x: x.zfill(10) if len(x) < 10 else x)
-        
-        # Thêm cột số thứ tự (TT)
         df_patients["TT"] = range(1, len(df_patients) + 1)
-        
-        # Cấu hình thứ tự hiển thị
         display_cols = ["TT", "Họ tên", "Giới tính", "Ngày sinh", "Số điện thoại", "Dịch vụ", "Bác sĩ", "Ngày Khám/Trị liệu", "Giờ Khám/Trị liệu", "Lý do"]
         available_cols = [c for c in display_cols if c in df_patients.columns]
-        
         st.dataframe(df_patients[available_cols], use_container_width=True, hide_index=True)
-    else:
-        st.info("Chưa có khách hàng nào.")
 
 with tab3:
     st.header("🚀 Chạy Tối ưu hóa")
