@@ -46,6 +46,7 @@ with tab1:
             phone = st.text_input("Số điện thoại *")
             dob = st.date_input("Ngày tháng năm sinh", min_value=datetime(1900, 1, 1))
             
+            # Tạo mốc thời gian
             time_options = []
             curr = datetime.combine(datetime.today(), time(8, 0))
             end_morning = datetime.combine(datetime.today(), time(12, 0))
@@ -86,11 +87,9 @@ with tab2:
     st.header("Danh sách khách hàng chờ xếp lịch")
     if len(st.session_state.patients_list) > 0:
         df_patients = pd.DataFrame(st.session_state.patients_list)
-        # 1. Tạo cột TT bắt đầu từ 1
-        df_patients.insert(0, "TT", range(1, len(df_patients) + 1))
-        # 2. Đảm bảo thứ tự hiển thị đúng yêu cầu
-        display_cols = ["TT", "Họ tên", "Giới tính", "Ngày sinh", "Số điện thoại", "Dịch vụ", "Bác sĩ", "Thời gian", "Lý do"]
-        st.dataframe(df_patients[display_cols], use_container_width=True, hide_index=True)
+        # Danh sách cột hiển thị theo thứ tự bạn muốn (đã bỏ cột TT)
+        display_cols = ["Họ tên", "Giới tính", "Ngày sinh", "Số điện thoại", "Dịch vụ", "Bác sĩ", "Thời gian", "Lý do"]
+        st.dataframe(df_patients[display_cols], use_container_width=True)
     else:
         st.info("Chưa có khách hàng nào.")
 
