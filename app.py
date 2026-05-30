@@ -39,43 +39,26 @@ with tab1:
         c1, c2 = st.columns(2)
         full_name = c1.text_input("Họ tên *")
         gender = c2.selectbox("Giới tính", ["Nam", "Nữ", "Khác"])
-        
         c3, c4 = st.columns(2)
         dob = c3.date_input("Ngày sinh", min_value=datetime(1900, 1, 1))
         phone = c4.text_input("Số điện thoại *")
-        
         c5, c6 = st.columns(2)
         service_type = c5.selectbox("Dịch vụ *", ["Khám mới", "Tái khám", "Điều trị theo vùng", "Điều trị chuyên sâu"])
-        doctor_select = c6.selectbox("Bác sĩ *", doctor_list)
-        
+        doctor_select = c6.selectbox("Bác sĩ *", [None] + doctor_list)
         c7, c8 = st.columns(2)
         exam_date = c7.date_input("Ngày Khám/Trị liệu *", min_value=datetime.today())
-        
-        time_options = []
-        curr = datetime.combine(datetime.today(), time(8, 0))
-        end_morning = datetime.combine(datetime.today(), time(12, 0))
-        while curr <= end_morning:
-            time_options.append(curr.time()); curr += timedelta(minutes=15)
-        curr = datetime.combine(datetime.today(), time(13, 30))
-        end_evening = datetime.combine(datetime.today(), time(18, 0))
-        while curr <= end_evening:
-            time_options.append(curr.time()); curr += timedelta(minutes=15)
-            
-        appointment_time = c8.select_slider("Giờ Khám/Trị liệu *", options=time_options, format_func=lambda x: x.strftime('%H:%M'))
-        
+        appointment_time = c8.time_input("Giờ Khám (Nếu có)")
         reason = st.text_area("Lý do")
-        submit_button = st.form_submit_button("Lưu đặt lịch")
         
+        submit_button = st.form_submit_button("Lưu đặt lịch")
         if submit_button:
             if not full_name or not phone:
                 st.error("Vui lòng điền đầy đủ các trường bắt buộc (*)")
-            elif not is_valid_phone(phone):
-                st.error("Số điện thoại không hợp lệ!")
             else:
                 new_patient = {
                     "Họ tên": full_name, "Giới tính": gender, "Ngày sinh": str(dob), 
                     "Số điện thoại": phone, "Dịch vụ": service_type, "Bác sĩ": doctor_select, 
-                    "Ngày Khám/Trị liệu": str(exam_date), "Giờ Khám/Trị liệu": str(appointment_time), "Lý do": reason
+                    "Ngày Khám/Trị liệu": str(exam_date), "Giờ Khám/Trị liệu": str(appointment_time) if appointment_time else None, "Lý do": reason
                 }
                 st.session_state.patients_list.append(new_patient)
                 st.success(f"Đã thêm khách hàng {full_name} thành công!")
@@ -87,18 +70,13 @@ with tab2:
         try:
             df_new = pd.read_excel(uploaded_patients) if uploaded_patients.name.endswith('.xlsx') else pd.read_csv(uploaded_patients)
             st.session_state.patients_list = df_new.to_dict('records')
-            st.success("Đã thêm dữ liệu từ file!")
-        except Exception as e:
-            st.error(f"Lỗi file: {e}")
+            st.success(f"Đã nạp {len(df_new)} khách hàng.")
+        except Exception as e: st.error(f"Lỗi file: {e}")
 
     if len(st.session_state.patients_list) > 0:
         df_patients = pd.DataFrame(st.session_state.patients_list)
-        df_patients["Số điện thoại"] = df_patients["Số điện thoại"].astype(str).str.replace(r'\.0$', '', regex=True)
-        df_patients["Số điện thoại"] = df_patients["Số điện thoại"].apply(lambda x: x.zfill(10) if len(x) < 10 else x)
         df_patients["TT"] = range(1, len(df_patients) + 1)
-        display_cols = ["TT", "Họ tên", "Giới tính", "Ngày sinh", "Số điện thoại", "Dịch vụ", "Bác sĩ", "Ngày Khám/Trị liệu", "Giờ Khám/Trị liệu", "Lý do"]
-        available_cols = [c for c in display_cols if c in df_patients.columns]
-        st.dataframe(df_patients[available_cols], use_container_width=True, hide_index=True)
+        st.dataframe(df_patients, use_container_width=True, hide_index=True)
 
 with tab3:
     st.header("🚀 Chạy Tối ưu hóa (Phương pháp chuyên sâu)")
@@ -106,39 +84,34 @@ with tab3:
     
     if st.button("Chạy Thuật toán Phân công"):
         df_today = pd.DataFrame(st.session_state.patients_list)
+        df_today = df_today[df_today["Ngày Khám/Trị liệu"] == str(target_date)]
+        
         if df_today.empty: st.warning("Danh sách trống!"); st.stop()
         
         model = cp_model.CpModel()
         horizon = 34
         durations = {"Khám mới": 3, "Tái khám": 3, "Điều trị theo vùng": 5, "Điều trị chuyên sâu": 8}
         
-        # 1. Tạo biến quyết định
-        # X[i, d, t] = 1 nếu bệnh nhân i khám bác sĩ d tại thời điểm t
         x = {}
         for i, row in df_today.iterrows():
             d_dur = durations.get(row["Dịch vụ"], 3)
-            # Ràng buộc bác sĩ: Nếu trống, cho phép toàn bộ danh sách, nếu đã chọn thì chỉ 1 bác sĩ
+            # Nếu đã chọn bác sĩ, chỉ định đúng index
             valid_docs = [doctor_list.index(row["Bác sĩ"])] if pd.notna(row["Bác sĩ"]) and row["Bác sĩ"] in doctor_list else range(len(doctor_list))
-            
-            # Giới hạn dịch vụ khó
+            # Ràng buộc dịch vụ khó
             if row["Dịch vụ"] in ["Điều trị theo vùng", "Điều trị chuyên sâu"]:
-                valid_docs = [d for d in valid_docs if d <= 2] # TS Phúc, Th.S Dương, BS Hưng
+                valid_docs = [d for d in valid_docs if d <= 2] 
             
             for d in valid_docs:
                 for t in range(horizon - d_dur + 1):
                     x[i, d, t] = model.NewBoolVar(f'x_p{i}_d{d}_t{t}')
         
-        # 2. Ràng buộc: Mỗi bệnh nhân chỉ được chọn 1 cặp (Bác sĩ, Giờ)
         for i in range(len(df_today)):
             model.Add(sum(x[i, d, t] for (p, d, t) in x if p == i) == 1)
             
-        # 3. Ràng buộc: Không trùng lịch bác sĩ (No Overlap)
         for d in range(len(doctor_list)):
             for t in range(horizon):
-                # Tổng số bệnh nhân của bác sĩ d tại thời điểm t phải <= 1
                 model.Add(sum(x[i, d, start] for (i, doc, start) in x if doc == d and start <= t < start + durations.get(df_today.iloc[i]["Dịch vụ"], 3)) <= 1)
 
-        # 4. Giải bài toán
         solver = cp_model.CpSolver()
         if solver.Solve(model) == cp_model.OPTIMAL:
             st.success("Phân bổ tự động hoàn thành!")
@@ -149,30 +122,7 @@ with tab3:
                         h, m = 8 + (t * 15) // 60, (t * 15) % 60
                         results.append({"Họ tên": row["Họ tên"], "Giờ": f"{h:02d}:{m:02d}", "Bác sĩ": doctor_list[d]})
             st.dataframe(pd.DataFrame(results))
-            else:
-                st.error("⚠️ Không tìm thấy phương án tối ưu!")
-                
-                # CHẨN ĐOÁN NGUYÊN NHÂN
-                total_duration = sum([duration_map.get(row["Dịch vụ"], 3) for _, row in df_today.iterrows()])
-                total_capacity = 34 * (3 + 14) # 3 phòng + 14 giường * 34 block
-                
-                st.write("---")
-                st.subheader("🔍 Phân tích nguyên nhân:")
-                
-                # 1. Kiểm tra quá tải tổng thể
-                if total_duration > total_capacity:
-                    st.error(f"❌ **Quá tải tài nguyên:** Tổng thời gian yêu cầu của {len(df_today)} bệnh nhân ({total_duration} block) vượt quá năng lực phục vụ của phòng khám ({total_capacity} block).")
-                
-                # 2. Kiểm tra xung đột bác sĩ cụ thể
-                st.write("- **Kiểm tra theo bác sĩ:**")
-                load_by_doc = df_today.groupby("Bác sĩ")["Dịch vụ"].count()
-                st.write(load_by_doc)
-                
-                st.info("Gợi ý: Hãy thử tăng số lượng bác sĩ, tăng thời gian làm việc hoặc giảm số lượng bệnh nhân trong ngày.")
-                
-                # Cung cấp file log chi tiết (nếu cần)
-                if st.checkbox("Xem chi tiết lỗi từ Solver"):
-                    st.text(solver.ResponseStats())
+        else: st.error("Không tìm thấy phương án tối ưu.")
 
     if st.button("Xóa toàn bộ danh sách"):
         st.session_state.patients_list = []
