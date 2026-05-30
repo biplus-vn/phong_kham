@@ -80,9 +80,9 @@ with tab2:
 
 with tab3:
     st.header("🚀 Chạy Tối ưu hóa (Phương pháp chuyên sâu)")
+    
     target_date = st.date_input("Chọn ngày chạy:", min_value=datetime.today())
     if st.button("Chạy Tối ưu hóa"):
-        # Lọc dữ liệu và reset index để tránh lỗi out-of-bounds
         df_today = pd.DataFrame(st.session_state.patients_list)
         df_today["Ngày Khám/Trị liệu"] = pd.to_datetime(df_today["Ngày Khám/Trị liệu"]).dt.date
         df_today = df_today[df_today["Ngày Khám/Trị liệu"] == target_date].reset_index(drop=True)
@@ -91,16 +91,18 @@ with tab3:
         
         model = cp_model.CpModel()
         x = {}
-        # Dùng df_today đã reset index
         for i, row in df_today.iterrows():
-            d_dur = DURATIONS.get(row["Dịch vụ"], 3)
+            # Bây giờ DURATIONS đã được định nghĩa ở đầu file nên không còn NameError
+            d_dur = DURATIONS.get(row["Dịch vụ"], 3) 
+            
+            # Xử lý Bác sĩ
             valid_docs = [DOCTOR_LIST.index(row["Bác sĩ"])] if pd.notna(row["Bác sĩ"]) and row["Bác sĩ"] in DOCTOR_LIST else range(len(DOCTOR_LIST))
             if row["Dịch vụ"] in ["Điều trị theo vùng", "Điều trị chuyên sâu"]:
                 valid_docs = [d for d in valid_docs if d <= 2]
             
             for d in valid_docs:
                 for t in range(HORIZON - d_dur + 1):
-                    if not (16 <= t < 22):
+                    if not (16 <= t < 22): # Nghỉ trưa
                         x[i, d, t] = model.NewBoolVar(f'x_{i}_{d}_{t}')
         
         for i in range(len(df_today)): 
