@@ -39,16 +39,13 @@ with tab1:
         with col1:
             full_name = st.text_input("Họ và tên *")
             gender = st.selectbox("Giới tính", ["Nam", "Nữ", "Khác"])
-            # Vị trí mới: Bác sĩ chuyển sang cột 1
             doctor_select = st.selectbox("Bác sĩ khám/ Điều trị *", doctor_list)
             service_type = st.selectbox("Loại dịch vụ *", ["Khám mới", "Tái khám", "Điều trị theo vùng", "Điều trị chuyên sâu"])
         
         with col2:
             phone = st.text_input("Số điện thoại *")
-            # Vị trí mới: Ngày sinh chuyển sang cột 2
             dob = st.date_input("Ngày tháng năm sinh", min_value=datetime(1900, 1, 1))
             
-            # Khởi tạo mốc thời gian (bước 15 phút)
             time_options = []
             curr = datetime.combine(datetime.today(), time(8, 0))
             end_morning = datetime.combine(datetime.today(), time(12, 0))
@@ -73,14 +70,14 @@ with tab1:
                 st.error("Số điện thoại không hợp lệ! Vui lòng nhập đúng 10 chữ số bắt đầu bằng số 0.")
             else:
                 new_patient = {
-                    "Họ và tên": full_name,
+                    "Họ tên": full_name,
                     "Giới tính": gender,
                     "Ngày sinh": str(dob),
-                    "Dịch vụ": service_type,
                     "Số điện thoại": phone,
-                    "Lý do": reason,
+                    "Dịch vụ": service_type,
+                    "Bác sĩ": doctor_select,
                     "Thời gian": str(appointment_time),
-                    "Bác sĩ": doctor_select
+                    "Lý do": reason
                 }
                 st.session_state.patients_list.append(new_patient)
                 st.success(f"Đã thêm khách hàng {full_name} thành công!")
@@ -88,7 +85,12 @@ with tab1:
 with tab2:
     st.header("Danh sách khách hàng chờ xếp lịch")
     if len(st.session_state.patients_list) > 0:
-        st.dataframe(pd.DataFrame(st.session_state.patients_list), use_container_width=True)
+        df_patients = pd.DataFrame(st.session_state.patients_list)
+        # 1. Tạo cột TT bắt đầu từ 1
+        df_patients.insert(0, "TT", range(1, len(df_patients) + 1))
+        # 2. Đảm bảo thứ tự hiển thị đúng yêu cầu
+        display_cols = ["TT", "Họ tên", "Giới tính", "Ngày sinh", "Số điện thoại", "Dịch vụ", "Bác sĩ", "Thời gian", "Lý do"]
+        st.dataframe(df_patients[display_cols], use_container_width=True, hide_index=True)
     else:
         st.info("Chưa có khách hàng nào.")
 
