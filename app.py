@@ -80,48 +80,48 @@ with tab2:
 
 with tab3:
     st.header("🚀 Chạy Tối ưu hóa (Phương pháp chuyên sâu)")
-    target_date = st.date_input("Chọn ngày tối ưu hóa:", min_value=datetime.today())
-    
-    if st.button("Chạy Thuật toán Phân công"):
+    target_date = st.date_input("Chọn ngày chạy:", min_value=datetime.today())
+    if st.button("Chạy Tối ưu hóa"):
+        # Lọc dữ liệu và reset index để tránh lỗi out-of-bounds
         df_today = pd.DataFrame(st.session_state.patients_list)
-        df_today = df_today[df_today["Ngày Khám/Trị liệu"] == str(target_date)]
+        df_today["Ngày Khám/Trị liệu"] = pd.to_datetime(df_today["Ngày Khám/Trị liệu"]).dt.date
+        df_today = df_today[df_today["Ngày Khám/Trị liệu"] == target_date].reset_index(drop=True)
         
         if df_today.empty: st.warning("Danh sách trống!"); st.stop()
         
         model = cp_model.CpModel()
-        horizon = 34
-        durations = {"Khám mới": 3, "Tái khám": 3, "Điều trị theo vùng": 5, "Điều trị chuyên sâu": 8}
-        
         x = {}
+        # Dùng df_today đã reset index
         for i, row in df_today.iterrows():
-            d_dur = durations.get(row["Dịch vụ"], 3)
-            # Nếu đã chọn bác sĩ, chỉ định đúng index
-            valid_docs = [doctor_list.index(row["Bác sĩ"])] if pd.notna(row["Bác sĩ"]) and row["Bác sĩ"] in doctor_list else range(len(doctor_list))
-            # Ràng buộc dịch vụ khó
+            d_dur = DURATIONS.get(row["Dịch vụ"], 3)
+            valid_docs = [DOCTOR_LIST.index(row["Bác sĩ"])] if pd.notna(row["Bác sĩ"]) and row["Bác sĩ"] in DOCTOR_LIST else range(len(DOCTOR_LIST))
             if row["Dịch vụ"] in ["Điều trị theo vùng", "Điều trị chuyên sâu"]:
-                valid_docs = [d for d in valid_docs if d <= 2] 
+                valid_docs = [d for d in valid_docs if d <= 2]
             
             for d in valid_docs:
-                for t in range(horizon - d_dur + 1):
-                    x[i, d, t] = model.NewBoolVar(f'x_p{i}_d{d}_t{t}')
+                for t in range(HORIZON - d_dur + 1):
+                    if not (16 <= t < 22):
+                        x[i, d, t] = model.NewBoolVar(f'x_{i}_{d}_{t}')
         
-        for i in range(len(df_today)):
+        for i in range(len(df_today)): 
             model.Add(sum(x[i, d, t] for (p, d, t) in x if p == i) == 1)
             
-        for d in range(len(doctor_list)):
-            for t in range(horizon):
-                model.Add(sum(x[i, d, start] for (i, doc, start) in x if doc == d and start <= t < start + durations.get(df_today.iloc[i]["Dịch vụ"], 3)) <= 1)
+        for d in range(len(DOCTOR_LIST)):
+            for t in range(HORIZON):
+                # SỬA LỖI Ở ĐÂY: Dùng i trực tiếp là chỉ số của df_today đã reset
+                model.Add(sum(x[i, doc, start] for (i, doc, start) in x 
+                          if doc == d and start <= t < start + DURATIONS.get(df_today.iloc[i]["Dịch vụ"], 3)) <= 1)
 
         solver = cp_model.CpSolver()
         if solver.Solve(model) == cp_model.OPTIMAL:
-            st.success("Phân bổ tự động hoàn thành!")
+            st.success("Tối ưu hóa thành công!")
             results = []
             for i, row in df_today.iterrows():
                 for (p, d, t) in x:
                     if p == i and solver.Value(x[p, d, t]) == 1:
                         h, m = 8 + (t * 15) // 60, (t * 15) % 60
-                        results.append({"Họ tên": row["Họ tên"], "Giờ": f"{h:02d}:{m:02d}", "Bác sĩ": doctor_list[d]})
-            st.dataframe(pd.DataFrame(results))
+                        results.append({"Họ tên": row["Họ tên"], "Giờ": f"{h:02d}:{m:02d}", "Bác sĩ": DOCTOR_LIST[d]})
+            st.dataframe(pd.DataFrame(results), use_container_width=True)
         else: 
             st.error("⚠️ Không tìm thấy phương án tối ưu!")
             
