@@ -39,12 +39,14 @@ with tab1:
         with col1:
             full_name = st.text_input("Họ và tên *")
             gender = st.selectbox("Giới tính", ["Nam", "Nữ", "Khác"])
-            dob = st.date_input("Ngày tháng năm sinh", min_value=datetime(1900, 1, 1))
+            # Vị trí mới: Bác sĩ chuyển sang cột 1
+            doctor_select = st.selectbox("Bác sĩ khám/ Điều trị *", doctor_list)
             service_type = st.selectbox("Loại dịch vụ *", ["Khám mới", "Tái khám", "Điều trị theo vùng", "Điều trị chuyên sâu"])
         
         with col2:
             phone = st.text_input("Số điện thoại *")
-            doctor_select = st.selectbox("Bác sĩ khám/ Điều trị *", doctor_list)
+            # Vị trí mới: Ngày sinh chuyển sang cột 2
+            dob = st.date_input("Ngày tháng năm sinh", min_value=datetime(1900, 1, 1))
             
             # Khởi tạo mốc thời gian (bước 15 phút)
             time_options = []
@@ -81,7 +83,7 @@ with tab1:
                     "Bác sĩ": doctor_select
                 }
                 st.session_state.patients_list.append(new_patient)
-                st.success(f"Đã thêm khách hàng {full_name} vào hệ thống!")
+                st.success(f"Đã thêm khách hàng {full_name} thành công!")
 
 with tab2:
     st.header("Danh sách khách hàng chờ xếp lịch")
