@@ -90,35 +90,45 @@ with tab3:
     st.header("🚀 Chạy Tối ưu hóa (Phương pháp chuyên sâu)")
     
     target_date = st.date_input("Chọn ngày chạy:", min_value=datetime.today())
-    if st.button("Chạy Tối ưu hóa"):
+    if st.button("Chạy Thuật toán Phân công"):
         df_today = pd.DataFrame(st.session_state.patients_list)
         df_today["Ngày Khám/Trị liệu"] = pd.to_datetime(df_today["Ngày Khám/Trị liệu"]).dt.date
         df_today = df_today[df_today["Ngày Khám/Trị liệu"] == target_date].reset_index(drop=True)
         
-        if df_today.empty: st.warning("Danh sách trống!"); st.stop()
+        if df_today.empty: 
+            st.warning("Không có dữ liệu cho ngày này!")
+            st.stop()
         
         model = cp_model.CpModel()
         x = {}
+        # specialized_docs: Index 0, 1, 2 tương ứng với 3 bác sĩ chuyên môn
+        specialized_docs = range(3) 
+        
         for i, row in df_today.iterrows():
-            # Bây giờ DURATIONS đã được định nghĩa ở đầu file nên không còn NameError
-            d_dur = DURATIONS.get(row["Dịch vụ"], 3) 
+            d_dur = DURATIONS.get(row["Dịch vụ"], 3)
             
-            # Xử lý Bác sĩ
-            valid_docs = [DOCTOR_LIST.index(row["Bác sĩ"])] if pd.notna(row["Bác sĩ"]) and row["Bác sĩ"] in DOCTOR_LIST else range(len(DOCTOR_LIST))
+            # Xác định danh sách bác sĩ hợp lệ
+            valid_docs = [doctor_list.index(row["Bác sĩ"])] if pd.notna(row["Bác sĩ"]) and row["Bác sĩ"] in doctor_list else range(len(doctor_list))
+            
+            # Ràng buộc chuyên môn: Dịch vụ khó chỉ dành cho 3 bác sĩ đầu
             if row["Dịch vụ"] in ["Điều trị theo vùng", "Điều trị chuyên sâu"]:
-                valid_docs = [d for d in valid_docs if d <= 2]
+                valid_docs = [d for d in valid_docs if d in specialized_docs]
             
             for d in valid_docs:
                 for t in range(HORIZON - d_dur + 1):
-                    if not (16 <= t < 22): # Nghỉ trưa
+                    # RÀNG BUỘC THỜI GIAN:
+                    # Sáng: Kết thúc trước 12h (t + d_dur <= 16)
+                    # Chiều: Bắt đầu từ 13h30 (t >= 22) và kết thúc trước 18h (t + d_dur <= 34)
+                    if (t + d_dur <= 16) or (22 <= t and t + d_dur <= 34):
                         x[i, d, t] = model.NewBoolVar(f'x_{i}_{d}_{t}')
         
+        # Ràng buộc: Mỗi bệnh nhân được gán đúng 1 lịch
         for i in range(len(df_today)): 
             model.Add(sum(x[i, d, t] for (p, d, t) in x if p == i) == 1)
             
-        for d in range(len(DOCTOR_LIST)):
+        # Ràng buộc: Không trùng lịch bác sĩ
+        for d in range(len(doctor_list)):
             for t in range(HORIZON):
-                # SỬA LỖI Ở ĐÂY: Dùng i trực tiếp là chỉ số của df_today đã reset
                 model.Add(sum(x[i, doc, start] for (i, doc, start) in x 
                           if doc == d and start <= t < start + DURATIONS.get(df_today.iloc[i]["Dịch vụ"], 3)) <= 1)
 
@@ -129,8 +139,9 @@ with tab3:
             for i, row in df_today.iterrows():
                 for (p, d, t) in x:
                     if p == i and solver.Value(x[p, d, t]) == 1:
+                        # Chuyển đổi block thành thời gian hiển thị
                         h, m = 8 + (t * 15) // 60, (t * 15) % 60
-                        results.append({"Họ tên": row["Họ tên"], "Giờ": f"{h:02d}:{m:02d}", "Bác sĩ": DOCTOR_LIST[d]})
+                        results.append({"Họ tên": row["Họ tên"], "Giờ": f"{h:02d}:{m:02d}", "Bác sĩ": doctor_list[d]})
             st.dataframe(pd.DataFrame(results), use_container_width=True)
         else: 
             st.error("⚠️ Không tìm thấy phương án tối ưu!")
