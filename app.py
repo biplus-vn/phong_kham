@@ -140,7 +140,29 @@ with tab3:
                     results.append({"Họ tên": df_today.loc[item["id"], "Họ tên"], "Giờ bắt đầu": f"{h:02d}:{m:02d}", "Bác sĩ": item["doctor"]})
                 st.dataframe(pd.DataFrame(results))
             else:
-                st.error("Không tìm thấy phương án tối ưu.")
+                st.error("⚠️ Không tìm thấy phương án tối ưu!")
+                
+                # CHẨN ĐOÁN NGUYÊN NHÂN
+                total_duration = sum([duration_map.get(row["Dịch vụ"], 3) for _, row in df_today.iterrows()])
+                total_capacity = 34 * (3 + 14) # 3 phòng + 14 giường * 34 block
+                
+                st.write("---")
+                st.subheader("🔍 Phân tích nguyên nhân:")
+                
+                # 1. Kiểm tra quá tải tổng thể
+                if total_duration > total_capacity:
+                    st.error(f"❌ **Quá tải tài nguyên:** Tổng thời gian yêu cầu của {len(df_today)} bệnh nhân ({total_duration} block) vượt quá năng lực phục vụ của phòng khám ({total_capacity} block).")
+                
+                # 2. Kiểm tra xung đột bác sĩ cụ thể
+                st.write("- **Kiểm tra theo bác sĩ:**")
+                load_by_doc = df_today.groupby("Bác sĩ")["Dịch vụ"].count()
+                st.write(load_by_doc)
+                
+                st.info("Gợi ý: Hãy thử tăng số lượng bác sĩ, tăng thời gian làm việc hoặc giảm số lượng bệnh nhân trong ngày.")
+                
+                # Cung cấp file log chi tiết (nếu cần)
+                if st.checkbox("Xem chi tiết lỗi từ Solver"):
+                    st.text(solver.ResponseStats())
 
     if st.button("Xóa toàn bộ danh sách"):
         st.session_state.patients_list = []
