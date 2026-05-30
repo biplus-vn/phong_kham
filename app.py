@@ -120,7 +120,46 @@ with tab2:
         st.info("Chưa có khách hàng nào.")
 
 with tab3:
-    st.header("Tính toán tối ưu hóa")
+    st.header("🚀 Chạy Tối ưu hóa")
+    target_date = st.date_input("Chọn ngày tối ưu hóa:", min_value=datetime.today())
+    if st.button("Chạy Thuật toán Phân công (CP-SAT)"):
+        df_today = pd.DataFrame(st.session_state.patients_list)
+        if df_today.empty:
+            st.warning("Danh sách trống!")
+        else:
+            model = cp_model.CpModel()
+            horizon = 34
+            duration_map = {"Khám mới": 3, "Tái khám": 3, "Điều trị theo vùng": 5, "Điều trị chuyên sâu": 8}
+            intervals = []
+            for idx, row in df_today.iterrows():
+                dur = duration_map.get(row["Dịch vụ"], 3)
+                start = model.NewIntVar(0, horizon - dur, f"s{idx}")
+                end = model.NewIntVar(0, horizon, f"e{idx}")
+                interval = model.NewIntervalVar(start, dur, end, f"i{idx}")
+                intervals.append({"id": idx, "start": start, "interval": interval, "service": row["Dịch vụ"], "doctor": row["Bác sĩ"]})
+
+            doctor_groups = {}
+            for item in intervals:
+                doc = item["doctor"]
+                if doc not in doctor_groups: doctor_groups[doc] = []
+                doctor_groups[doc].append(item["interval"])
+            for doc_ints in doctor_groups.values(): model.AddNoOverlap(doc_ints)
+
+            model.AddCumulative([i["interval"] for i in intervals if i["service"] in ["Khám mới", "Tái khám"]], [1]*len(intervals), 3)
+            
+            solver = cp_model.CpSolver()
+            if solver.Solve(model) == cp_model.OPTIMAL:
+                st.success("Tối ưu hóa thành công!")
+                results = []
+                for item in intervals:
+                    start_time = solver.Value(item["start"])
+                    h = 8 + (start_time * 15) // 60
+                    m = (start_time * 15) % 60
+                    results.append({"Họ tên": df_today.loc[item["id"], "Họ tên"], "Giờ bắt đầu": f"{h:02d}:{m:02d}", "Bác sĩ": item["doctor"]})
+                st.dataframe(pd.DataFrame(results))
+            else:
+                st.error("Không tìm thấy phương án tối ưu.")
+
     if st.button("Xóa toàn bộ danh sách"):
         st.session_state.patients_list = []
         st.rerun()
