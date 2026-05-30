@@ -35,33 +35,28 @@ tab1, tab2, tab3 = st.tabs(["📋 Đặt lịch khách hàng", "📅 Danh sách 
 with tab1:
     st.info("⏰ Giờ hoạt động: Sáng (08:00 - 12:00) | Chiều (13:30 - 18:00)")
     with st.form("booking_form", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            # Thứ tự yêu cầu: Họ tên, Giới tính, Ngày sinh, Số điện thoại, Dịch vụ
-            full_name = st.text_input("Họ tên *")
-            gender = st.selectbox("Giới tính", ["Nam", "Nữ", "Khác"])
-            dob = st.date_input("Ngày sinh", min_value=datetime(1900, 1, 1))
-            phone = st.text_input("Số điện thoại *")
-            service_type = st.selectbox("Dịch vụ *", ["Khám mới", "Tái khám", "Điều trị theo vùng", "Điều trị chuyên sâu"])
+        # Layout từ trên xuống, từ trái qua phải
+        full_name = st.text_input("Họ tên *")
+        gender = st.selectbox("Giới tính", ["Nam", "Nữ", "Khác"])
+        dob = st.date_input("Ngày sinh", min_value=datetime(1900, 1, 1))
+        phone = st.text_input("Số điện thoại *")
+        service_type = st.selectbox("Dịch vụ *", ["Khám mới", "Tái khám", "Điều trị theo vùng", "Điều trị chuyên sâu"])
+        doctor_select = st.selectbox("Bác sĩ *", doctor_list)
+        exam_date = st.date_input("Ngày Khám/Trị liệu *", min_value=datetime.today())
         
-        with col2:
-            # Thứ tự yêu cầu: Bác sĩ, Ngày Khám/Trị liệu, Giờ Khám/Trị liệu, Lý do
-            doctor_select = st.selectbox("Bác sĩ *", doctor_list)
-            exam_date = st.date_input("Ngày Khám/Trị liệu *", min_value=datetime.today())
-            
-            # Tạo mốc thời gian (bước 15 phút)
-            time_options = []
-            curr = datetime.combine(datetime.today(), time(8, 0))
-            end_morning = datetime.combine(datetime.today(), time(12, 0))
-            while curr <= end_morning:
-                time_options.append(curr.time()); curr += timedelta(minutes=15)
-            curr = datetime.combine(datetime.today(), time(13, 30))
-            end_evening = datetime.combine(datetime.today(), time(18, 0))
-            while curr <= end_evening:
-                time_options.append(curr.time()); curr += timedelta(minutes=15)
-            
-            appointment_time = st.select_slider("Giờ Khám/Trị liệu *", options=time_options, format_func=lambda x: x.strftime('%H:%M'))
-            reason = st.text_area("Lý do")
+        # Tạo mốc thời gian (bước 15 phút)
+        time_options = []
+        curr = datetime.combine(datetime.today(), time(8, 0))
+        end_morning = datetime.combine(datetime.today(), time(12, 0))
+        while curr <= end_morning:
+            time_options.append(curr.time()); curr += timedelta(minutes=15)
+        curr = datetime.combine(datetime.today(), time(13, 30))
+        end_evening = datetime.combine(datetime.today(), time(18, 0))
+        while curr <= end_evening:
+            time_options.append(curr.time()); curr += timedelta(minutes=15)
+        
+        appointment_time = st.select_slider("Giờ Khám/Trị liệu *", options=time_options, format_func=lambda x: x.strftime('%H:%M'))
+        reason = st.text_area("Lý do")
         
         submit_button = st.form_submit_button("Lưu đặt lịch")
         
@@ -72,12 +67,12 @@ with tab1:
                 st.error("Số điện thoại không hợp lệ!")
             else:
                 new_patient = {
-                    "Họ tên": full_name, "Giới tính": gender, "Ngày sinh": str(dob), "Số điện thoại": phone,
-                    "Dịch vụ": service_type, "Bác sĩ": doctor_select, "Ngày Khám/Trị liệu": str(exam_date),
-                    "Giờ Khám/Trị liệu": str(appointment_time), "Lý do": reason
+                    "Họ tên": full_name, "Giới tính": gender, "Ngày sinh": str(dob), 
+                    "Số điện thoại": phone, "Dịch vụ": service_type, "Bác sĩ": doctor_select, 
+                    "Ngày Khám/Trị liệu": str(exam_date), "Giờ Khám/Trị liệu": str(appointment_time), "Lý do": reason
                 }
                 st.session_state.patients_list.append(new_patient)
-                st.success("Đã thêm khách hàng thành công!")
+                st.success(f"Đã thêm khách hàng {full_name} thành công!")
 
 with tab2:
     st.header("Danh sách khách hàng chờ xếp lịch")
@@ -94,7 +89,6 @@ with tab2:
 
     if len(st.session_state.patients_list) > 0:
         df_patients = pd.DataFrame(st.session_state.patients_list)
-        # Thứ tự cột yêu cầu
         display_cols = ["Họ tên", "Giới tính", "Ngày sinh", "Số điện thoại", "Dịch vụ", "Bác sĩ", "Ngày Khám/Trị liệu", "Giờ Khám/Trị liệu", "Lý do"]
         available_cols = [c for c in display_cols if c in df_patients.columns]
         st.dataframe(df_patients[available_cols], use_container_width=True)
