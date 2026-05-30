@@ -12,7 +12,6 @@ if 'patients_list' not in st.session_state:
 
 # --- HÀM BỔ TRỢ ---
 def is_valid_phone(phone):
-    # Regex: Bắt đầu bằng 0, theo sau là 9 chữ số (tổng 10 số)
     return re.match(r'^0\d{9}$', phone) is not None
 
 # --- GIAO DIỆN CHÍNH ---
@@ -23,11 +22,9 @@ with st.sidebar:
     st.header("Cấu hình Dữ liệu")
     uploaded_file = st.file_uploader("Upload danh sách bác sĩ (CSV/Excel)", type=['csv', 'xlsx'])
     
-    # Danh sách bác sĩ mặc định nếu chưa upload
     doctor_list = ["Bác sĩ Nguyễn Văn A", "Bác sĩ Trần Thị B", "Bác sĩ Lê Văn C"]
     if uploaded_file:
         try:
-            # Đọc file (giả định định dạng chuẩn như mô tả)
             df_doctors = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
             doctor_list = df_doctors['ho_va_ten'].unique().tolist()
             st.success("Danh sách bác sĩ đã cập nhật!")
@@ -45,6 +42,8 @@ with tab1:
             full_name = st.text_input("Họ và tên *")
             gender = st.selectbox("Giới tính", ["Nam", "Nữ", "Khác"])
             dob = st.date_input("Ngày tháng năm sinh", min_value=datetime(1900, 1, 1))
+            # Bổ sung trường Dịch vụ
+            service_type = st.selectbox("Loại dịch vụ *", ["Khám mới", "Tái khám", "Điều trị theo vùng", "Điều trị chuyên sâu"])
         
         with col2:
             phone = st.text_input("Số điện thoại *", help="Nhập 10 chữ số bắt đầu bằng số 0")
@@ -65,13 +64,14 @@ with tab1:
                     "Họ và tên": full_name,
                     "Giới tính": gender,
                     "Ngày sinh": str(dob),
+                    "Dịch vụ": service_type,
                     "Số điện thoại": phone,
                     "Lý do": reason,
                     "Thời gian": str(appointment_time),
                     "Bác sĩ": doctor_select
                 }
                 st.session_state.patients_list.append(new_patient)
-                st.success(f"Đã thêm khách hàng {full_name} vào hệ thống!")
+                st.success(f"Đã thêm khách hàng {full_name} ({service_type}) thành công!")
 
 with tab2:
     st.header("Danh sách khách hàng chờ xếp lịch")
@@ -88,8 +88,8 @@ with tab3:
             st.warning("Vui lòng nhập danh sách khách hàng trước!")
         else:
             with st.spinner("Đang chạy thuật toán tối ưu hóa OR-Tools..."):
-                # Tại đây sẽ tích hợp logic ortools.sat.python.cp_model
-                # Đang chờ xử lý dữ liệu từ session_state.patients_list
+                # Gợi ý: Tại đây bạn sẽ dùng service_type để định nghĩa duration cho CP-SAT
+                # Khám: 40p, ĐT theo vùng: 60p, ĐT chuyên sâu: 100p
                 import time
                 time.sleep(2) 
                 st.success("Tối ưu hóa hoàn thành thành công!")
