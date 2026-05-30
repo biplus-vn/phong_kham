@@ -102,8 +102,11 @@ with tab2:
     if len(st.session_state.patients_list) > 0:
         df_patients = pd.DataFrame(st.session_state.patients_list)
         
-        # Định dạng Số điện thoại thành chuỗi và xử lý lỗi đuôi .0
+        # XỬ LÝ ĐỊNH DẠNG SỐ ĐIỆN THOẠI CHUẨN:
+        # 1. Chuyển sang chuỗi, loại bỏ định dạng float (.0)
+        # 2. Đảm bảo có đủ 10 số, thêm số 0 vào đầu nếu thiếu
         df_patients["Số điện thoại"] = df_patients["Số điện thoại"].astype(str).str.replace(r'\.0$', '', regex=True)
+        df_patients["Số điện thoại"] = df_patients["Số điện thoại"].apply(lambda x: x.zfill(10) if len(x) < 10 else x)
         
         # Thêm cột số thứ tự (TT)
         df_patients["TT"] = range(1, len(df_patients) + 1)
