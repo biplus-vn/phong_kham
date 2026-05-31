@@ -144,27 +144,23 @@ with tab3:
         
         if all_results:
             st.success("Tối ưu hóa toàn bộ thành công!")
-            
-            # Chuyển kết quả sang DataFrame
             df_res = pd.DataFrame(all_results)
             
-            # 1. Tạo cột thời gian để sắp xếp (loại bỏ _sort_time sau khi sắp xếp)
+            # 1. Chuyển đổi giờ để sắp xếp đúng thứ tự thời gian
             df_res["_sort_time"] = pd.to_datetime(df_res["Giờ Khám/Trị liệu"], format="%H:%M").dt.time
             
-            # 2. Sắp xếp: Ngày -> Bác sĩ -> Giờ
+            # 2. Sắp xếp dữ liệu theo yêu cầu: Ngày -> Bác sĩ -> Giờ
             df_res = df_res.sort_values(by=["Ngày Khám/Trị liệu", "Bác sỹ", "_sort_time"])
             
-            # 3. Định hình cột theo đúng thứ tự bạn yêu cầu
+            # 3. Chọn thứ tự 5 cột theo yêu cầu của bạn
             cols = ["Ngày Khám/Trị liệu", "Bác sỹ", "Dịch vụ", "Giờ Khám/Trị liệu", "Khách hàng"]
             df_res = df_res[cols]
             
-            # 4. Sử dụng Multi-index để tạo cấu trúc "cây" (Ngày -> Bác sĩ)
-            # Khi đặt index như này, Streamlit sẽ nhóm Ngày và Bác sĩ một cách trực quan
-            df_display = df_res.set_index(["Ngày Khám/Trị liệu", "Bác sỹ"])
-            
-            st.subheader("📋 Lịch khám chi tiết")
+            # 4. Hiển thị dạng phân cấp (Cây) luôn mở
+            # Việc set_index vào các cột chính sẽ tạo ra cấu trúc nhóm trực quan
+            st.subheader("📋 Lịch khám chi tiết toàn bộ")
             st.dataframe(
-                df_display, 
+                df_res.set_index(["Ngày Khám/Trị liệu", "Bác sỹ"]), 
                 use_container_width=True
             )
         else:
