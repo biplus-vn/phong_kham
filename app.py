@@ -92,54 +92,61 @@ with tab3:
         df_all = pd.DataFrame(st.session_state.patients_list)
         if df_all.empty: st.warning("Danh sách trống!"); st.stop()
         
-        # Sắp xếp theo ngày
         df_all["Ngày Khám/Trị liệu"] = pd.to_datetime(df_all["Ngày Khám/Trị liệu"]).dt.date
         df_all = df_all.sort_values(by="Ngày Khám/Trị liệu").reset_index(drop=True)
         
         all_results = []
+        # Cấu hình tài nguyên vật lý
+        PHONG_LIST = ["PK 422", "PK 417", "PK 418"]
+        GIUONG_LIST = ["VIP 402", "VIP 416"] + ["ĐT 421-1", "ĐT 421-2", "ĐT 421-3", "ĐT 419-1", "ĐT 419-2", "ĐT 419-3", "ĐT 403-1", "ĐT 403-2", "ĐT 405-1", "ĐT 405-2", "ĐT 407-1", "ĐT 407-2"]
+        
         for target_date in df_all["Ngày Khám/Trị liệu"].unique():
             df_today = df_all[df_all["Ngày Khám/Trị liệu"] == target_date].reset_index(drop=True)
             model = cp_model.CpModel()
-            
             x = {}
-            # Logic tối ưu: Mỗi bệnh nhân được gán 1 Bác sĩ và 1 Giờ
+            
             for i, row in df_today.iterrows():
-                d_dur = DURATIONS.get(row["Dịch vụ"], 3)
-                valid_docs = [DOCTOR_LIST.index(row["Bác sĩ"])] if pd.notna(row["Bác sĩ"]) and row["Bác sĩ"] in DOCTOR_LIST else range(len(DOCTOR_LIST))
+                is_kham = row["Dịch vụ"] in ["Khám mới", "Tái khám"]
+                # Thời lượng = Ca + phát sinh + nghỉ (block 15')
+                d_dur = 3 if is_kham else (6 if row["Dịch vụ"] == "Điều trị theo vùng" else 9)
                 
-                # Ràng buộc chuyên môn (3 bác sĩ đầu làm ca khó)
-                if row["Dịch vụ"] in ["Điều trị theo vùng", "Điều trị chuyên sâu"]:
-                    valid_docs = [d for d in valid_docs if d <= 2]
-                
-                for d in valid_docs:
+                resources = PHONG_LIST if is_kham else GIUONG_LIST
+                for r_idx, res_name in enumerate(resources):
                     for t in range(HORIZON - d_dur + 1):
-                        # Loại trừ nghỉ trưa (16-22) và đảm bảo kết thúc trước 18h
                         if (t + d_dur <= 16) or (22 <= t and t + d_dur <= 34):
-                            x[i, d, t] = model.NewBoolVar(f'x_{i}_{d}_{t}')
+                            x[i, r_idx, res_name, t] = model.NewBoolVar(f'x_{i}_{r_idx}_{res_name}_{t}')
             
-            # Ràng buộc: Mỗi người 1 lịch
-            for i in range(len(df_today)):
-                model.Add(sum(x[i, d, t] for (p, d, t) in x if p == i) == 1)
-                
-            # Ràng buộc: Không trùng lịch Bác sĩ
-            for d in range(len(DOCTOR_LIST)):
+            # 1. Mỗi bệnh nhân 1 lịch
+            for i in range(len(df_today)): 
+                model.Add(sum(x[i, r, name, t] for (p_i, r, name, t) in x if p_i == i) == 1)
+            
+            # 2. Ràng buộc Phòng (Tối đa 3 người/phòng)
+            for name in PHONG_LIST:
                 for t in range(HORIZON):
-                    model.Add(sum(x[i, doc, start] for (i, doc, start) in x 
-                              if doc == d and start <= t < start + DURATIONS.get(df_today.iloc[i]["Dịch vụ"], 3)) <= 1)
+                    model.Add(sum(x[i, r, res, start] for (i, r, res, start) in x 
+                              if res == name and start <= t < start + 3) <= 3)
             
+            # 3. Ràng buộc Giường (Tối đa 1 người/giường)
+            for name in GIUONG_LIST:
+                for t in range(HORIZON):
+                    model.Add(sum(x[i, r, res, start] for (i, r, res, start) in x 
+                              if res == name and start <= t < start + 6) <= 1)
+
             solver = cp_model.CpSolver()
             if solver.Solve(model) == cp_model.OPTIMAL:
                 for i, row in df_today.iterrows():
-                    for (p_i, d, t) in x:
-                        if p_i == i and solver.Value(x[p_i, d, t]) == 1:
+                    for (p_i, r, name, t) in x:
+                        if p_i == i and solver.Value(x[p_i, r, name, t]) == 1:
                             h, m = 8 + (t * 15) // 60, (t * 15) % 60
                             all_results.append({
                                 "Ngày Khám/Trị liệu": target_date,
-                                "Bác sỹ": DOCTOR_LIST[d],
+                                "Bác sỹ": row["Bác sĩ"] or "Tự động",
                                 "Dịch vụ": row["Dịch vụ"],
                                 "Giờ Khám/Trị liệu": f"{h:02d}:{m:02d}",
-                                "Khách hàng": row["Họ tên"]
+                                "Khách hàng": row["Họ tên"],
+                                "Phòng/Giường": name # Tài nguyên
                             })
+            else: st.error(f"⚠️ Không thể tối ưu ngày {target_date}!")
         
         if all_results:
             st.success("Tối ưu hóa thành công!")
@@ -152,7 +159,7 @@ with tab3:
             df_res = df_res.sort_values(by=["Ngày Khám/Trị liệu", "Bác sỹ", "_sort_time"])
             
             # 3. Định dạng lại thứ tự 5 cột theo yêu cầu
-            df_res = df_res[["Ngày Khám/Trị liệu", "Bác sỹ", "Dịch vụ", "Giờ Khám/Trị liệu", "Khách hàng"]]
+            df_res = df_res[["Ngày Khám/Trị liệu", "Bác sỹ", "Dịch vụ", "Giờ Khám/Trị liệu", "Khách hàng", "Phòng/Giường"]]
             
             st.subheader("📋 Lịch khám chi tiết")
             
