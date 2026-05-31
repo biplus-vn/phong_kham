@@ -146,23 +146,17 @@ with tab3:
             st.success("Tối ưu hóa toàn bộ thành công!")
             df_res = pd.DataFrame(all_results)
             
-            # 1. Chuyển đổi giờ để sắp xếp đúng thứ tự thời gian
+            # CHUYỂN ĐỔI GIỜ THÀNH DẠNG SỐ ĐỂ SẮP XẾP ĐÚNG
             df_res["_sort_time"] = pd.to_datetime(df_res["Giờ Khám/Trị liệu"], format="%H:%M").dt.time
             
-            # 2. Sắp xếp dữ liệu theo yêu cầu: Ngày -> Bác sĩ -> Giờ
+            # Sắp xếp theo Ngày, Bác sỹ và Giờ
             df_res = df_res.sort_values(by=["Ngày Khám/Trị liệu", "Bác sỹ", "_sort_time"])
             
-            # 3. Chọn thứ tự 5 cột theo yêu cầu của bạn
-            cols = ["Ngày Khám/Trị liệu", "Bác sỹ", "Dịch vụ", "Giờ Khám/Trị liệu", "Khách hàng"]
-            df_res = df_res[cols]
-            
-            # 4. Hiển thị dạng phân cấp (Cây) luôn mở
-            # Việc set_index vào các cột chính sẽ tạo ra cấu trúc nhóm trực quan
-            st.subheader("📋 Lịch khám chi tiết toàn bộ")
-            st.dataframe(
-                df_res.set_index(["Ngày Khám/Trị liệu", "Bác sỹ"]), 
-                use_container_width=True
-            )
+            # Hiển thị theo nhóm Bác sĩ
+            for (date, doctor), group in df_res.groupby(["Ngày Khám/Trị liệu", "Bác sỹ"]):
+                with st.expander(f"📅 {date} | 👨‍⚕️ {doctor} ({len(group)} ca khám)"):
+                    # Loại bỏ cột phụ _sort_time trước khi hiển thị
+                    st.dataframe(group.drop(columns=["_sort_time"]), use_container_width=True, hide_index=True)
         else:
             st.error("⚠️ Không tìm thấy phương án tối ưu!")
 
