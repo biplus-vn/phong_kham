@@ -144,7 +144,19 @@ with tab3:
         
         if all_results:
             st.success("Tối ưu hóa toàn bộ thành công!")
-            st.dataframe(pd.DataFrame(all_results), use_container_width=True)
+            df_res = pd.DataFrame(all_results)
+            
+            # CHUYỂN ĐỔI GIỜ THÀNH DẠNG SỐ ĐỂ SẮP XẾP ĐÚNG
+            df_res["_sort_time"] = pd.to_datetime(df_res["Giờ Khám/Trị liệu"], format="%H:%M").dt.time
+            
+            # Sắp xếp theo Ngày, Bác sỹ và Giờ
+            df_res = df_res.sort_values(by=["Ngày Khám/Trị liệu", "Bác sỹ", "_sort_time"])
+            
+            # Hiển thị theo nhóm Bác sĩ
+            for (date, doctor), group in df_res.groupby(["Ngày Khám/Trị liệu", "Bác sỹ"]):
+                with st.expander(f"📅 {date} | 👨‍⚕️ {doctor} ({len(group)} ca khám)"):
+                    # Loại bỏ cột phụ _sort_time trước khi hiển thị
+                    st.dataframe(group.drop(columns=["_sort_time"]), use_container_width=True, hide_index=True)
         else:
             st.error("⚠️ Không tìm thấy phương án tối ưu!")
 
