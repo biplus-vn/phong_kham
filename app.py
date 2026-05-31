@@ -142,7 +142,7 @@ with tab3:
                             })
         
         if all_results:
-            st.success("Tối ưu hóa toàn bộ thành công!")
+            st.success("Tối ưu hóa thành công!")
             df_res = pd.DataFrame(all_results)
             
             # 1. Chuyển đổi giờ để sắp xếp đúng thứ tự thời gian
