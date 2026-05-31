@@ -83,7 +83,6 @@ with tab2:
 
     if len(st.session_state.patients_list) > 0:
         df_patients = pd.DataFrame(st.session_state.patients_list)
-        df_patients["TT"] = range(1, len(df_patients) + 1)
         st.dataframe(df_patients, use_container_width=True, hide_index=True)
 
 with tab3:
