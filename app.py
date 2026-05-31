@@ -88,92 +88,47 @@ with tab2:
 
 with tab3:
     st.header("🚀 Chạy Tối ưu hóa (Phương pháp chuyên sâu)")
-    
-    target_date = st.date_input("Chọn ngày chạy:", min_value=datetime.today())
-    if st.button("Chạy Thuật toán Phân công"):
-        df_today = pd.DataFrame(st.session_state.patients_list)
-        df_today["Ngày Khám/Trị liệu"] = pd.to_datetime(df_today["Ngày Khám/Trị liệu"]).dt.date
-        df_today = df_today[df_today["Ngày Khám/Trị liệu"] == target_date].reset_index(drop=True)
-        
-        if df_today.empty: 
-            st.warning("Không có dữ liệu cho ngày này!")
-            st.stop()
-        
-        model = cp_model.CpModel()
-        x = {}
-        # specialized_docs: Index 0, 1, 2 tương ứng với 3 bác sĩ chuyên môn
-        specialized_docs = range(3) 
-        
-        for i, row in df_today.iterrows():
-            d_dur = DURATIONS.get(row["Dịch vụ"], 3)
-            
-            # Xác định danh sách bác sĩ hợp lệ
-            valid_docs = [doctor_list.index(row["Bác sĩ"])] if pd.notna(row["Bác sĩ"]) and row["Bác sĩ"] in doctor_list else range(len(doctor_list))
-            
-            # Ràng buộc chuyên môn: Dịch vụ khó chỉ dành cho 3 bác sĩ đầu
-            if row["Dịch vụ"] in ["Điều trị theo vùng", "Điều trị chuyên sâu"]:
-                valid_docs = [d for d in valid_docs if d in specialized_docs]
-            
-            for d in valid_docs:
-                for t in range(HORIZON - d_dur + 1):
-                    # RÀNG BUỘC THỜI GIAN:
-                    # Sáng: Kết thúc trước 12h (t + d_dur <= 16)
-                    # Chiều: Bắt đầu từ 13h30 (t >= 22) và kết thúc trước 18h (t + d_dur <= 34)
-                    if (t + d_dur <= 16) or (22 <= t and t + d_dur <= 34):
-                        x[i, d, t] = model.NewBoolVar(f'x_{i}_{d}_{t}')
-        
-        # Ràng buộc: Mỗi bệnh nhân được gán đúng 1 lịch
-        for i in range(len(df_today)): 
-            model.Add(sum(x[i, d, t] for (p, d, t) in x if p == i) == 1)
-            
-        # Ràng buộc: Không trùng lịch bác sĩ
-        for d in range(len(doctor_list)):
-            for t in range(HORIZON):
-                model.Add(sum(x[i, doc, start] for (i, doc, start) in x 
-                          if doc == d and start <= t < start + DURATIONS.get(df_today.iloc[i]["Dịch vụ"], 3)) <= 1)
 
-        solver = cp_model.CpSolver()
-        if solver.Solve(model) == cp_model.OPTIMAL:
-            st.success("Tối ưu hóa thành công!")
-            results = []
+    df_all = pd.DataFrame(st.session_state.patients_list)
+        if df_all.empty: st.warning("Danh sách trống!"); st.stop()
+        
+        df_all["Ngày Khám/Trị liệu"] = pd.to_datetime(df_all["Ngày Khám/Trị liệu"]).dt.date
+        df_all = df_all.sort_values(by="Ngày Khám/Trị liệu").reset_index(drop=True)
+        
+        all_results = []
+        for target_date in df_all["Ngày Khám/Trị liệu"].unique():
+            df_today = df_all[df_all["Ngày Khám/Trị liệu"] == target_date].reset_index(drop=True)
+            
+            model = cp_model.CpModel()
+            x = {}
             for i, row in df_today.iterrows():
-                for (p, d, t) in x:
-                    if p == i and solver.Value(x[p, d, t]) == 1:
-                        # Chuyển đổi block thành thời gian hiển thị
-                        h, m = 8 + (t * 15) // 60, (t * 15) % 60
-                        results.append({"Họ tên": row["Họ tên"], "Giờ": f"{h:02d}:{m:02d}", "Bác sĩ": doctor_list[d]})
-            st.dataframe(pd.DataFrame(results), use_container_width=True)
-        else: 
-            st.error("⚠️ Không tìm thấy phương án tối ưu!")
+                d_dur = DURATIONS.get(row["Dịch vụ"], 3)
+                valid_docs = [DOCTOR_LIST.index(row["Bác sĩ"])] if pd.notna(row["Bác sĩ"]) and row["Bác sĩ"] in DOCTOR_LIST else range(len(DOCTOR_LIST))
+                if row["Dịch vụ"] in ["Điều trị theo vùng", "Điều trị chuyên sâu"]:
+                    valid_docs = [d for d in valid_docs if d <= 2]
+                
+                for d in valid_docs:
+                    for t in range(HORIZON - d_dur + 1):
+                        if (t + d_dur <= 16) or (22 <= t and t + d_dur <= 34):
+                            x[i, d, t] = model.NewBoolVar(f'x_{i}_{d}_{t}')
             
-            # --- HÀM PHÂN TÍCH NGUYÊN NHÂN CHI TIẾT ---
-            st.subheader("🔍 Chẩn đoán nguyên nhân bế tắc:")
-            
-            # 1. Kiểm tra tải trọng bác sĩ
-            # Tổng block bệnh nhân yêu cầu / (Số lượng bác sĩ * tổng block làm việc)
-            total_required_blocks = sum(durations.get(r["Dịch vụ"], 3) for _, r in df_today.iterrows())
-            total_available_doctor_blocks = len(doctor_list) * horizon
-            
-            # 2. Kiểm tra xung đột dịch vụ chuyên sâu (chỉ 3 bác sĩ đầu tiên)
-            specialized_patients = df_today[df_today["Dịch vụ"].isin(["Điều trị theo vùng", "Điều trị chuyên sâu"])]
-            specialized_blocks = sum(durations.get(r["Dịch vụ"], 3) for _, r in specialized_patients.iterrows())
-            capacity_specialized = 3 * horizon # 3 bác sĩ * 34 block
-            
-            # Hiển thị phân tích
-            col1, col2 = st.columns(2)
-            col1.metric("Tổng thời gian yêu cầu", f"{total_required_blocks} blocks")
-            col2.metric("Tổng năng lực toàn hệ thống", f"{total_available_doctor_blocks} blocks")
-            
-            if total_required_blocks > total_available_doctor_blocks:
-                st.error(f"❌ **Quá tải tổng thể:** Tổng nhu cầu của {len(df_today)} bệnh nhân ({total_required_blocks} blocks) vượt quá năng lực phục vụ của tất cả các bác sĩ cộng lại ({total_available_doctor_blocks} blocks).")
-            
-            if specialized_blocks > capacity_specialized:
-                st.error(f"❌ **Quá tải dịch vụ chuyên sâu:** Bạn có {len(specialized_patients)} ca điều trị khó, cần {specialized_blocks} blocks, nhưng chỉ có 3 bác sĩ thực hiện được với tổng năng lực {capacity_specialized} blocks.")
-            
-            if len(df_today) > 100: # Ví dụ ngưỡng chặn
-                st.warning("⚠️ Số lượng bệnh nhân quá lớn cho một ngày. Solver sẽ bị giới hạn bộ nhớ và thời gian tính toán.")
+            for i in range(len(df_today)): model.Add(sum(x[i, d, t] for (p, d, t) in x if p == i) == 1)
+            for d in range(len(DOCTOR_LIST)):
+                for t in range(HORIZON):
+                    model.Add(sum(x[i, doc, start] for (i, doc, start) in x if doc == d and start <= t < start + DURATIONS.get(df_today.iloc[i]["Dịch vụ"], 3)) <= 1)
 
-            st.info("💡 **Giải pháp:** Hãy chia nhỏ danh sách thành nhiều ngày, hoặc thêm bác sĩ có chuyên môn điều trị chuyên sâu.")
+            solver = cp_model.CpSolver()
+            if solver.Solve(model) == cp_model.OPTIMAL:
+                for i, row in df_today.iterrows():
+                    for (p, d, t) in x:
+                        if p == i and solver.Value(x[p, d, t]) == 1:
+                            h, m = 8 + (t * 15) // 60, (t * 15) % 60
+                            all_results.append({"Ngày": target_date, "Họ tên": row["Họ tên"], "Giờ": f"{h:02d}:{m:02d}", "Bác sĩ": DOCTOR_LIST[d]})
+            else: st.error(f"⚠️ Không thể tối ưu ngày {target_date}!")
+
+        if all_results:
+            st.success("Tối ưu hóa toàn bộ thành công!")
+            st.dataframe(pd.DataFrame(all_results), use_container_width=True)
 
     if st.button("Xóa toàn bộ danh sách"):
         st.session_state.patients_list = []
