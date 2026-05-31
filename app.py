@@ -89,7 +89,8 @@ with tab2:
 with tab3:
     st.header("🚀 Chạy Tối ưu hóa (Phương pháp chuyên sâu)")
 
-    df_all = pd.DataFrame(st.session_state.patients_list)
+    if st.button("Chạy Tối ưu hóa cho tất cả các ngày"):
+        df_all = pd.DataFrame(st.session_state.patients_list)
         if df_all.empty: st.warning("Danh sách trống!"); st.stop()
         
         df_all["Ngày Khám/Trị liệu"] = pd.to_datetime(df_all["Ngày Khám/Trị liệu"]).dt.date
