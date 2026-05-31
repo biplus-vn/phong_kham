@@ -78,7 +78,7 @@ with tab2:
         try:
             df_new = pd.read_excel(uploaded_patients) if uploaded_patients.name.endswith('.xlsx') else pd.read_csv(uploaded_patients)
             st.session_state.patients_list = df_new.to_dict('records')
-            st.success(f"Đã nạp {len(df_new)} khách hàng.")
+            st.success(f"Đã tải thành công {len(df_new)} khách hàng.")
         except Exception as e: st.error(f"Lỗi file: {e}")
 
     if len(st.session_state.patients_list) > 0:
