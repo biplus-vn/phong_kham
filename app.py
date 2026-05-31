@@ -145,21 +145,26 @@ with tab3:
         if all_results:
             st.success("Tối ưu hóa toàn bộ thành công!")
             
-            # Chuyển thành DataFrame
+            # Chuyển kết quả sang DataFrame
             df_res = pd.DataFrame(all_results)
             
-            # Sắp xếp để đảm bảo đúng thứ tự: Ngày -> Bác sĩ -> Giờ
+            # 1. Tạo cột thời gian để sắp xếp (loại bỏ _sort_time sau khi sắp xếp)
             df_res["_sort_time"] = pd.to_datetime(df_res["Giờ Khám/Trị liệu"], format="%H:%M").dt.time
+            
+            # 2. Sắp xếp: Ngày -> Bác sĩ -> Giờ
             df_res = df_res.sort_values(by=["Ngày Khám/Trị liệu", "Bác sỹ", "_sort_time"])
             
-            # Sắp xếp cột theo yêu cầu của bạn
-            df_res = df_res[["Ngày Khám/Trị liệu", "Bác sỹ", "Dịch vụ", "Giờ Khám/Trị liệu", "Khách hàng"]]
+            # 3. Định hình cột theo đúng thứ tự bạn yêu cầu
+            cols = ["Ngày Khám/Trị liệu", "Bác sỹ", "Dịch vụ", "Giờ Khám/Trị liệu", "Khách hàng"]
+            df_res = df_res[cols]
             
-            # Hiển thị dạng bảng (tự động phân nhóm/phân cấp nhìn rất trực quan)
-            # Chúng ta để Ngày làm cột chính (index) để dễ nhìn theo từng ngày
-            st.subheader("📋 Lịch khám tổng hợp")
+            # 4. Sử dụng Multi-index để tạo cấu trúc "cây" (Ngày -> Bác sĩ)
+            # Khi đặt index như này, Streamlit sẽ nhóm Ngày và Bác sĩ một cách trực quan
+            df_display = df_res.set_index(["Ngày Khám/Trị liệu", "Bác sỹ"])
+            
+            st.subheader("📋 Lịch khám chi tiết")
             st.dataframe(
-                df_res.set_index(["Ngày Khám/Trị liệu", "Bác sỹ"]), 
+                df_display, 
                 use_container_width=True
             )
         else:
