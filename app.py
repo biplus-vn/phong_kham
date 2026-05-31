@@ -144,19 +144,28 @@ with tab3:
         
         if all_results:
             st.success("Tối ưu hóa toàn bộ thành công!")
+            
+            # Tạo DataFrame kết quả
             df_res = pd.DataFrame(all_results)
             
-            # CHUYỂN ĐỔI GIỜ THÀNH DẠNG SỐ ĐỂ SẮP XẾP ĐÚNG
+            # 1. Xử lý sắp xếp thời gian (để hiển thị thứ tự giờ trong cây)
             df_res["_sort_time"] = pd.to_datetime(df_res["Giờ Khám/Trị liệu"], format="%H:%M").dt.time
-            
-            # Sắp xếp theo Ngày, Bác sỹ và Giờ
             df_res = df_res.sort_values(by=["Ngày Khám/Trị liệu", "Bác sỹ", "_sort_time"])
             
-            # Hiển thị theo nhóm Bác sĩ
-            for (date, doctor), group in df_res.groupby(["Ngày Khám/Trị liệu", "Bác sỹ"]):
-                with st.expander(f"📅 {date} | 👨‍⚕️ {doctor} ({len(group)} ca khám)"):
-                    # Loại bỏ cột phụ _sort_time trước khi hiển thị
-                    st.dataframe(group.drop(columns=["_sort_time"]), use_container_width=True, hide_index=True)
+            # 2. Định dạng lại cấu trúc bảng để hiển thị dạng cây (Multi-Index)
+            # Chúng ta đẩy các cột nhóm làm index
+            df_display = df_res.set_index(["Ngày Khám/Trị liệu", "Bác sỹ"])
+            
+            # 3. Giữ lại các cột cần thiết (Dịch vụ, Giờ, Khách hàng)
+            df_display = df_display[["Giờ Khám/Trị liệu", "Dịch vụ", "Khách hàng"]]
+            
+            st.subheader("📋 Lịch khám phân cấp (Ngày -> Bác sĩ -> Khách hàng)")
+            
+            # Hiển thị bảng dạng cây
+            st.dataframe(
+                df_display, 
+                use_container_width=True
+            )
         else:
             st.error("⚠️ Không tìm thấy phương án tối ưu!")
 
