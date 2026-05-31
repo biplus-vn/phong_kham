@@ -154,7 +154,7 @@ with tab3:
             # 3. Định dạng lại thứ tự 5 cột theo yêu cầu
             df_res = df_res[["Ngày Khám/Trị liệu", "Bác sỹ", "Dịch vụ", "Giờ Khám/Trị liệu", "Khách hàng"]]
             
-            st.subheader("📋 Lịch khám chi tiết toàn bộ")
+            st.subheader("📋 Lịch khám chi tiết")
             
             # 4. Hiển thị nhóm mà không cần expander (luôn mở)
             # Dùng groupby để nhóm và hiển thị từng bảng con nối tiếp nhau
