@@ -146,17 +146,27 @@ with tab3:
             st.success("Tối ưu hóa toàn bộ thành công!")
             df_res = pd.DataFrame(all_results)
             
-            # CHUYỂN ĐỔI GIỜ THÀNH DẠNG SỐ ĐỂ SẮP XẾP ĐÚNG
+            # 1. Chuyển đổi giờ để sắp xếp đúng thứ tự thời gian
             df_res["_sort_time"] = pd.to_datetime(df_res["Giờ Khám/Trị liệu"], format="%H:%M").dt.time
             
-            # Sắp xếp theo Ngày, Bác sỹ và Giờ
+            # 2. Sắp xếp theo Ngày, Bác sỹ và Giờ
             df_res = df_res.sort_values(by=["Ngày Khám/Trị liệu", "Bác sỹ", "_sort_time"])
             
-            # Hiển thị theo nhóm Bác sĩ
+            # 3. Định dạng lại thứ tự 5 cột theo yêu cầu
+            df_res = df_res[["Ngày Khám/Trị liệu", "Bác sỹ", "Dịch vụ", "Giờ Khám/Trị liệu", "Khách hàng"]]
+            
+            st.subheader("📋 Lịch khám chi tiết toàn bộ")
+            
+            # 4. Hiển thị nhóm mà không cần expander (luôn mở)
+            # Dùng groupby để nhóm và hiển thị từng bảng con nối tiếp nhau
             for (date, doctor), group in df_res.groupby(["Ngày Khám/Trị liệu", "Bác sỹ"]):
-                with st.expander(f"📅 {date} | 👨‍⚕️ {doctor} ({len(group)} ca khám)"):
-                    # Loại bỏ cột phụ _sort_time trước khi hiển thị
-                    st.dataframe(group.drop(columns=["_sort_time"]), use_container_width=True, hide_index=True)
+                st.markdown(f"**📅 Ngày: {date} | 👨‍⚕️ Bác sĩ: {doctor}**")
+                # Hiển thị bảng luôn mở, không có nút thu gọn
+                st.dataframe(
+                    group.drop(columns=["Ngày Khám/Trị liệu", "Bác sỹ"]), 
+                    use_container_width=True, 
+                    hide_index=True
+                )
         else:
             st.error("⚠️ Không tìm thấy phương án tối ưu!")
 
